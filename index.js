@@ -225,7 +225,35 @@ app.post('/newanimal',function(req,res){
 
 })
 
+app.post('/deleteanimal',function(req,res){
+  console.log('im deleting a animal')
+  console.log(req.body)
+  let nombre = req.body.nombre
+  var sql = 'DELETE FROM exotic WHERE nombre = ?'
+  connection.query(sql,[nombre],function(error,result){
+    if(error){
+      console.log('incorrect')
+    }else{
+      console.log('success')
+      res.send({'result':'deleted'})
+    }
+  })
+})
 
+app.post('/deleteuser',function(req,res){
+  console.log('im deleting a user')
+  console.log(req.body)
+  let username = req.body.username
+  var sql = 'DELETE FROM users WHERE username = ?'
+  connection.query(sql,[username],function(error,result){
+    if(error){
+      console.log('incorrect')
+    }else{
+      console.log('success')
+      res.send({'result':'deleted'})
+    }
+  })
+})
 
 // //*Send update data to the DataBase
 // app.post("/api/update", (req, res) => {
