@@ -79,9 +79,11 @@ const bodyParser = require("body-parser");
 const mysql = require("mysql");
 //const { connect } = require("http2");
 const app = express();
+const jwt = require('jsonwebtoken');
 // const path = require("path");
 const cors = require("cors");
-
+//new
+const accessTokenSecret = 'youraccesstokensecret';
 // app.use(function (req, res, next) {
 //   res.header("Access-Control-Allow-Origin", "*");
 //   res.header("Access-Control-Allow-Credentials", true);
@@ -109,6 +111,36 @@ app.get('/'), (req, res) => {
   res.send("Hello")
 }
 
+app.use(function(req, res, next) {
+	res.header("Access-Control-Allow-Origin", "*");
+	res.header("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT");
+	res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+	next();
+  });
+
+  const authenticateJWT = (req, res, next) => {
+    console.log(req.headers);
+
+    const authHeader = req.headers.authorization;
+
+  if (authHeader) {
+      const token = authHeader.split(' ')[1];
+
+      jwt.verify(token, accessTokenSecret, (err, user) => {
+          if (err) {
+              console.log(err)
+              return res.sendStatus(403);
+          }
+
+          req.user = user;
+          next();
+      });
+  } else {
+      res.sendStatus(401);
+  }
+};
+
+
 //*Get all the data from DataBase
 app.get("/users", (req, res) => {
   connection.connect(function (err) {
@@ -130,36 +162,65 @@ app.get("/users", (req, res) => {
 });
 
 
+// app.post('/login',function(req,res){//luego ha de coincidir con angular
+//     // desde angular se pasa usuari y password (lsa variables son con el mismo nombre)
+//     console.log("estic dins login")
+//     console.log(req.body)
+//     let user = req.body.user;
+//     let password = req.body.password;
+    
+//     var sql = 'SELECT * FROM users WHERE username=? and password=?';
+
+//     connection.query(sql,[user,password],function(error,result){
+//         if(error){
+//             res.send({'result':'error'})
+//         }else{
+//             console.log(result);
+//             //res.json(result[0]);
+//            // const accessToken = jwt.sign({ username: result.username,  role: result.role }, accessTokenSecret);
+//             res.json(result[0]);
+//           }
+//     })
+// });
+
 app.post('/login',function(req,res){//luego ha de coincidir con angular
-    // desde angular se pasa usuari y password (lsa variables son con el mismo nombre)
-    console.log("estic dins login")
-    console.log(req.body)
-    let user = req.body.user;
-    let password = req.body.password;
+  // desde angular se pasa usuari y password (lsa variables son con el mismo nombre)
+  console.log("estic dins login")
+  console.log(req.body)
+  let username = req.body.username;
+  let password = req.body.password;
 
-    // connection.connect(function(err){
-    //     if(err){
-    //         console.log('error connecting' + err.stack);
-    //         return;
-    //     }
-    //     console.log('connected as id' + connection.threadId);
-    // });
+  var sql = 'SELECT * FROM users WHERE username=? and password=?';
+  //SELECT * FROM `users` WHERE `username` = "arnaualbert" and `password` = "pass1"; 
+  //var sql = 'SELECT * FROM `users` WHERE `username` = ? and `password` = ?'; 
+  connection.query(sql,[username,password],function(error,result){
+    if(error){
+      console.log("no")
+        res.send('username or password incorrect')
+    }else{
+        if(result.length > 0){
+          console.log("entry")
+          console.log(result);
+          const accessToken = jwt.sign({ username: result.username,  role: result.role }, accessTokenSecret, {expiresIn: '1h'});
+          // res.json(result[0]);
+          res.json({ resultats: result[0], accessToken: accessToken})
+          console.log(JSON.stringify(result[0]));
+          user = result[0];
+          // const accessToken = jwt.sign({ username: user.username,  role: user.role }, accessTokenSecret);
 
-
-    ////var sql = 'SELECT * FROM accounts WHERE full_name=? and account_type=?';
-    var sql = 'SELECT * FROM users WHERE username=? and password=?';
-
-    connection.query(sql,[user,password],function(error,result){
-        if(error){
-            res.send('username or password incorrect')
+          // res.json({
+          //     accessToken
+          // });
         }else{
-            console.log(result);
-            res.json(result[0]);
+          console.log("mal")
+          res.send()
         }
-    })
+    }
+  })
 
 
 });
+
 
 
 app.post('/register',function(req,res){
@@ -179,6 +240,7 @@ app.post('/register',function(req,res){
   connection.query(sql,[username,password,name,lastname,role,mail,number,age],function(error,result){
   if(error){
     res.send('incorrect')
+    console.log(error)
     console.log('incorrect')
   }else(
     console.log('success')
@@ -200,7 +262,7 @@ app.get('/tabla', function(req,res){
   })
 });
 
-app.post('/newanimal',function(req,res){
+app.post('/newanimal',authenticateJWT,function(req,res){
   console.log('im adding a new animal')
   console.log(req.body)
   let nombre = req.body.nombre
@@ -216,6 +278,7 @@ app.post('/newanimal',function(req,res){
     if(error){
       console.log('incorrect')
       res.send('incorrect')
+      console.log(error)
     }else{
       //res.send(JSON.stringify(result))
       console.log('success');
@@ -255,6 +318,26 @@ app.post('/deleteuser',function(req,res){
   })
 })
 
+app.post("/updateanimal",function(req,res){
+  console.log('im updating a animal')
+  console.log(req.body)
+  let nombre = req.body.nombre
+  let especie = req.body.especie
+  let cantidad = req.body.cantidad
+  let familia = req.body.familia
+  let alimentacion = req.body.alimentacion
+  let habitat = req.body.habitat
+
+  var sql = 'UPDATE exotic SET especie = ?, cantidad = ?, familia = ?, alimentacion = ?, habitat = ? WHERE nombre = ?'
+  connection.query(sql,[especie,cantidad,familia,alimentacion,habitat,nombre],function(error,result){
+    if(error){
+      console.log('incorrect')
+      console.log(error)
+    }else{
+      res.send({'result':'updated'})
+    }
+  })
+})
 // //*Send update data to the DataBase
 // app.post("/api/update", (req, res) => {
 //   let data = req.body;
